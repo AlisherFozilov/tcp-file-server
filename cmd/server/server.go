@@ -2,23 +2,23 @@ package main
 
 import (
 	"bufio"
+	gc "github.com/AlisherFozilov/file-server/pkg/globconst"
 	"io"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 )
 
-const address = "0.0.0.0:9999"
-
 func main() {
-	listener, err := net.Listen("tcp", address)
+	listener, err := net.Listen("tcp", gc.Address)
 	if err != nil {
 		log.Fatal("can't listen: ", err)
 	}
 	defer listener.Close()
-	
+
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -38,29 +38,34 @@ func handleConn(conn net.Conn) {
 		log.Println("can't get command: ", err)
 		return
 	}
-	//command := commands[0]
+
 	switch command {
-	case '0':
+	case gc.Upload:
 		filename, err := reader.ReadString('\n')
 		if err != nil {
 			log.Println("can't get filename: ", err)
 		}
 		filename = filename[:len(filename)-1]
-		file, err := os.OpenFile("copy-"+filename, os.O_CREATE | os.O_WRONLY, 0666)
+		file, err := os.OpenFile("copy-"+filename,
+			os.O_CREATE | os.O_WRONLY, 0666)
+
 		if err != nil {
 			log.Printf("can't open file %v: %v", filename, err)
 			return
 		}
 		defer file.Close()
-		fileWriter := bufio.NewWriterSize(file, 1024*1024)
+		fileWriter := bufio.NewWriter(file)
 
 		_, err = io.Copy(fileWriter, reader)
 		if err != nil {
 			log.Println("can't get file: ", err)
 			return
 		}
-		fileWriter.Flush()
-	case '1':
+		err = fileWriter.Flush()
+		if err != nil {
+			log.Println("can't write file: ", file)
+		}
+	case gc.Download:
 		filename, err := reader.ReadString('\n')
 		if err != nil {
 			log.Println("can't get filename: ", err)
@@ -72,14 +77,31 @@ func handleConn(conn net.Conn) {
 			log.Println(err)
 			return
 		}
+		defer file.Close()
 
-		reader := bufio.NewReaderSize(file, 1024*1024)
-		_, err = io.Copy(conn, reader)
+		open, err := os.Open(filename)
 		if err != nil {
 			log.Println(err)
 			return
 		}
-	case '2':
+
+		stat, err := open.Stat()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		fileSize := stat.Size()
+		fileSizeStr := strconv.Itoa(int(fileSize))
+
+		conn.Write([]byte(fileSizeStr))
+		conn.Write([]byte{'\n'})
+
+		_, err = io.Copy(conn, file)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+	case gc.List:
 		log.Println("list start")
 		dirents, err := ioutil.ReadDir(".")
 		if err != nil {
