@@ -1,3 +1,5 @@
 .idea
 *.txt
 *.mkv
+*.exe
+serverdata/
