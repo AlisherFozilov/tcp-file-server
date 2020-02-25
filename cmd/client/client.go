@@ -9,7 +9,7 @@ import (
 	"os"
 )
 
-const commandsList = `Here's list of gc:
+const commandsList = `Here's list of commands:
 upload
 download
 list`
@@ -25,6 +25,12 @@ func init() {
 func main() {
 	rootCommand := base.Client
 	args := os.Args[1:]
+
+	if len(args) < 1 {
+		fmt.Println(base.Client.ShortDescription)
+		fmt.Println(commandsList)
+		return
+	}
 
 	for {
 		for _, command := range rootCommand.Commands {
@@ -45,7 +51,7 @@ func main() {
 				break
 			}
 
-			command.Run(command, args)
+			command.Run(command, args[1:])
 			return
 		}
 
